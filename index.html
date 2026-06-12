@@ -187,7 +187,7 @@ td.mono { font-family: 'JetBrains Mono', monospace; font-size: 12px; }
     line-height: 1.3;
   }
   #dashboard::after {
-    content: 'Produto: RDC  ·  Sistema SAC  ·  Gerado em: ' attr(data-date);
+    content: 'Produto: RDC  ·  Sistema ' attr(data-amort) '  ·  Gerado em: ' attr(data-date);
     display: block;
     font-size: 8pt;
     color: #6b7280;
@@ -326,6 +326,11 @@ td.mono { font-family: 'JetBrains Mono', monospace; font-size: 12px; }
             <input type="text" id="in-vl-prest" placeholder="0" inputmode="numeric"/>
             <div class="hint">Seguro da 1ª parcela</div>
           </div>
+          <div class="form-group">
+            <label>Valor prestamista 2ª parcela (R$)</label>
+            <input type="text" id="in-vl-prest2" placeholder="0" inputmode="numeric"/>
+            <div class="hint">Calibra o coef. do seguro. Vazio/0 = padrão 0,000360</div>
+          </div>
 
           <!-- ─── CAMPOS PÓS-FIXADA ─── -->
           <div class="form-group field-pos">
@@ -377,12 +382,12 @@ td.mono { font-family: 'JetBrains Mono', monospace; font-size: 12px; }
     <div class="section-title">Parâmetros</div>
     <p class="section-sub">Ajuste as variáveis para simular diferentes cenários</p>
     <div class="controls-wrap">
-      <div class="controls-label">Configurações da Aplicação</div>
+      <div class="controls-label">Cenário — CDI projetado (recalcula crédito pós-fixado e aplicação) · % do CDI · IR</div>
       <div class="sliders">
         <div class="slider-group">
           <label>CDI ao ano</label>
           <div class="slider-row">
-            <input type="range" id="sl-cdi" min="8" max="20" step="0.05" value="14.90"/>
+            <input type="range" id="sl-cdi" min="5" max="30" step="0.05" value="14.90"/>
             <span class="slider-val" id="lb-cdi">14,90%</span>
           </div>
         </div>
@@ -452,6 +457,8 @@ td.mono { font-family: 'JetBrains Mono', monospace; font-size: 12px; }
       <ul class="disc-list">
         <li>Simulação realizada em <strong id="disc-data">—</strong>, considerando primeira parcela para <strong id="disc-parc1">—</strong>.</li>
         <li>Produto em garantia: <strong>RDC</strong> · Rentabilidade: <strong id="disc-pct">105% do CDI</strong> · IR sobre rendimento: 15% (tributação RDC no resgate).</li>
+        <li>Base da aplicação em garantia: <strong id="disc-base">—</strong> (valor financiado menos IOF financiado).</li>
+        <li>Seguro prestamista (2ª parcela em diante): coeficiente <strong id="disc-coef">—</strong> sobre saldo devedor + juros do mês.</li>
         <li>Modalidade do crédito: <strong id="disc-modalidade">—</strong>.</li>
         <li>CDI anual utilizado na simulação: <strong id="disc-tx-cdi">14,90%</strong>.</li>
         <li>Amortização pelo sistema <strong id="disc-amort">SAC</strong>.</li>
@@ -477,6 +484,8 @@ td.mono { font-family: 'JetBrains Mono', monospace; font-size: 12px; }
 let PARCELAS = [];       // tabela base (do cálculo da planilha) - já com custo por parcela
 let VALOR_LIQUIDO = 0;   // valor financiado - IOF (para a aplicação)
 let META = {};           // metadados
+let PARAMS_CALC = null;  // parâmetros do último cálculo (p/ recalcular crédito pós no slider de CDI)
+let CDI_CREDITO = null;  // CDI anual (fração) usado na tabela de crédito atual
 let chartAcum, chartDif, chartSaldo;
 let slidersInit = false;
 
@@ -607,7 +616,7 @@ maskNumOnly(document.getElementById('in-qt-parc'));
 ['in-tx-pre','in-tx-cdi','in-tx-cdi-pre','in-tx-spread','in-cdi-aplic'].forEach(id => maskTaxa(document.getElementById(id)));
 
 // Campos de VALOR monetário (com ponto de milhar): crédito, IOF, prestamista
-['in-vl-cred','in-vl-iof','in-vl-prest'].forEach(id => maskMoeda(document.getElementById(id)));
+['in-vl-cred','in-vl-iof','in-vl-prest','in-vl-prest2'].forEach(id => maskMoeda(document.getElementById(id)));
 
 /* ══════════════════════════════════════════════════════════════════
    CÁLCULO DA TABELA (lógica da planilha Excel)
@@ -633,24 +642,28 @@ maskNumOnly(document.getElementById('in-qt-parc'));
    Linha n>=2:
      G(n) = indexador CDI sobre K(n-1) [pós] OU 0 [pré]
      H(n) = taxa fixa (spread ou pré) sobre K(n-1)
-     F(n) = E(n) * 0.00030018 (prestamista a partir da 2ª)
+     F(n) = E(n) * coef (prestamista a partir da 2ª; coef calibrado pela
+            2ª parcela informada ou padrão 0,00036)
      I(n) = amortização SAC = valorFin / qtParc (constante)
      J(n) = TRUNC(I+H+G+F, 6)
      K(n) = max(0, K(n-1) - I)
    ══════════════════════════════════════════════════════════════════ */
 
-const PREST_COEF = 0.00030018;
+// Coeficiente padrão do seguro prestamista sobre (saldo devedor + juros do mês).
+// Validado contra simulação bancária oficial SAC-CDI de 04/2026 (a planilha-mãe
+// usava 0,00030018, que subestimava o seguro em ~16% vs operação real).
+const PREST_COEF = 0.00036;
 
 function calcularTabelaPlanilha(p) {
   // p: { modalidade, amortizacao, dtLib, dtParc, txFixaM, txCdiA, valorFin, iof, qtParc, prestamista1, cdiAplicPct }
   // modalidade:  'pos' (CDI + spread) | 'pre' (só taxa fixa)
   // amortizacao: 'sac' (default) | 'price' (só na pré-fixada)
-  const { modalidade, dtLib, dtParc, txFixaM, txCdiA, valorFin, iof, qtParc, prestamista1 } = p;
+  const { modalidade, dtLib, dtParc, txFixaM, txCdiA, valorFin, iof, qtParc, prestamista1, prestamista2 } = p;
   const isPos = modalidade === 'pos';
   const isPrice = !isPos && p.amortizacao === 'price';
 
   // ── SISTEMA PRICE (só pré-fixada) ──
-  // Replica exatamente a Simulação Unicred (Crédito Investidor PRICE):
+  // Replica exatamente a simulação oficial do banco (modalidade PRICE):
   //  Juros 1     = PV × ((1+i)^(D1/30) − 1)   onde D1 = dias 1ª parcela
   //  PMT (parcela fixa) calibrado para zerar saldo no fim
   //  Amort n     = PMT − Juros n
@@ -686,7 +699,10 @@ function calcularTabelaPlanilha(p) {
   const H1 = k_fixa;
   const I1 = qtParc >= 1 ? valorFin / qtParc : 0;
   const J1 = truncN(I1 + H1 + G1 + F1, 6);
-  const K1 = truncN(E1 - J1, 6);
+  // Saldo devedor após a 1ª parcela = financiado - amortização. A planilha-mãe
+  // usava K1 = E1 - J1, o que abate também o seguro F1 do saldo — divergência
+  // comprovada contra a simulação oficial (o banco NÃO deduz o seguro).
+  const K1 = truncN(valorFin - I1, 6);
 
   tabela.push({
     n: 1, dtVenc: new Date(dtParc),
@@ -696,6 +712,7 @@ function calcularTabelaPlanilha(p) {
 
   // Linhas 2..N
   let C_prev = new Date(dtParc), K_prev = K1, I_prev = I1;
+  let coefSeg = PREST_COEF;
   const MAX_LIN = Math.max(qtParc + 2, 130);
 
   for (let n = 2; n <= MAX_LIN; n++) {
@@ -711,7 +728,9 @@ function calcularTabelaPlanilha(p) {
       G = isPos ? (K_prev * Math.pow(1 + txCdiM, D/30) - K_prev) : 0;
     }
     const E = K_prev + G + H;
-    const F = E * PREST_COEF;
+    // Calibra o coeficiente do seguro pela 2ª parcela da simulação do banco
+    if (n === 2 && prestamista2 > 0) coefSeg = prestamista2 / E;
+    const F = E * coefSeg;
     let I, J;
     if (n <= qtParc) {
       I = truncN(I_prev, 6);
@@ -732,11 +751,11 @@ function calcularTabelaPlanilha(p) {
   }
 
   const parcelasEfetivas = tabela.filter(r => r.n <= qtParc);
-  return { tabela: parcelasEfetivas, iof };
+  return { tabela: parcelasEfetivas, iof, coefSeg };
 }
 
 /* ══════════════════════════════════════════════════════════════════
-   SISTEMA PRICE — replica simulação Unicred (Crédito Investidor PRICE)
+   SISTEMA PRICE — replica a simulação oficial do banco (modalidade PRICE)
    ══════════════════════════════════════════════════════════════════
    Fórmulas validadas contra a proposta R$ 340.902,14 / 60x / 1,49% a.m.:
      Juros 1     = PV × ((1+i)^(D1/30) − 1)     [D1 = dias 1ª parcela]
@@ -744,16 +763,16 @@ function calcularTabelaPlanilha(p) {
      Juros n>=2  = Saldo × i  (mensal padrão)
      Amort n     = PMT − Juros n
      Saldo n     = Saldo n-1 − Amort n
-     F(n>=2)     = Saldo n-1 × 0.00036537  (coef. prestamista PRICE Unicred)
+     F(n>=2)     = Saldo n-1 × 0.00036537  (coef. prestamista PRICE padrão)
      1ª parcela: F1 = valor informado pelo usuário (input)
    ══════════════════════════════════════════════════════════════════ */
-const PREST_COEF_PRICE = 0.00036537; // coef. prestamista para PRICE (Unicred)
+const PREST_COEF_PRICE = 0.00036537; // coef. prestamista padrão para PRICE
 
 function calcularTabelaPrice(p) {
-  const { dtLib, dtParc, txFixaM, valorFin, iof, qtParc, prestamista1 } = p;
+  const { dtLib, dtParc, txFixaM, valorFin, iof, qtParc, prestamista1, prestamista2 } = p;
   const i = txFixaM;
-  // Unicred conta dias da 1ª parcela EXCLUINDO o dia do vencimento
-  // (ex: 13/05 → 15/06 = 33 dias corridos, mas Unicred usa 32)
+  // O banco conta os dias da 1ª parcela EXCLUINDO o dia do vencimento
+  // (ex: 13/05 → 15/06 = 33 dias corridos, mas a simulação oficial usa 32)
   const dias1Real = daysBetween(dtLib, dtParc);
   const dias1 = dias1Real > 1 ? dias1Real - 1 : dias1Real;
 
@@ -787,12 +806,16 @@ function calcularTabelaPrice(p) {
 
   saldo = saldoApos1;
 
+  // Coeficiente do seguro: calibrado pela 2ª parcela informada, senão padrão
+  let coefSegP = PREST_COEF_PRICE;
+  if (prestamista2 > 0 && saldoApos1 > 0) coefSegP = prestamista2 / saldoApos1;
+
   // Parcelas 2..N
   for (let n = 2; n <= qtParc; n++) {
     const Cnext = addMonth(tabela[n-2].dtVenc);
     const j = saldo * i;
     const a = PMT - j;
-    const F = saldo * PREST_COEF_PRICE; // prestamista PRICE (coef. ajustado)
+    const F = saldo * coefSegP; // prestamista PRICE (sobre saldo do mês anterior)
     const saldoNovo = saldo - a;
 
     tabela.push({
@@ -812,7 +835,7 @@ function calcularTabelaPrice(p) {
     saldo = saldoNovo;
   }
 
-  return { tabela, iof };
+  return { tabela, iof, coefSeg: coefSegP };
 }
 
 /* ══════════════════════════════════════════════════════════════════
@@ -839,6 +862,8 @@ function lerFormulario() {
   const valorFin = parseNum(document.getElementById('in-vl-cred').value);
   const iof     = parseNum(document.getElementById('in-vl-iof').value);
   const prest1  = parseNum(document.getElementById('in-vl-prest').value);
+  const prest2Raw = document.getElementById('in-vl-prest2').value;
+  const prest2  = String(prest2Raw).trim() ? parseNum(prest2Raw) : 0; // vazio = usa coef. padrão
   const cdiAplicP = parseNum(document.getElementById('in-cdi-aplic').value);
 
   // Campos condicionais por modalidade:
@@ -863,6 +888,8 @@ function lerFormulario() {
   if (!Number.isFinite(valorFin) || valorFin <= 0) erros.push('Valor financiado inválido');
   if (!Number.isFinite(iof) || iof < 0) erros.push('Valor do IOF inválido');
   if (!Number.isFinite(prest1) || prest1 < 0) erros.push('Valor prestamista 1ª parcela inválido');
+  if (!Number.isFinite(prest2) || prest2 < 0) erros.push('Valor prestamista 2ª parcela inválido');
+  if (Number.isFinite(iof) && Number.isFinite(valorFin) && iof >= valorFin && valorFin > 0) erros.push('IOF não pode ser maior ou igual ao valor financiado');
   if (!Number.isFinite(cdiAplicP) || cdiAplicP <= 0) erros.push('Rentabilidade aplicação inválida');
 
   // Avisos de sanidade (valores provavelmente inseridos errado)
@@ -888,6 +915,7 @@ function lerFormulario() {
     txCdiA:  txCdiP / 100,
     valorFin, iof,
     prestamista1: prest1,
+    prestamista2: prest2,
     cdiAplicPct: cdiAplicP / 100,
     produto: 'RDC',
     // display
@@ -906,20 +934,9 @@ function calcular() {
   const resultado = calcularTabelaPlanilha(p);
 
   // Popula estado global
-  PARCELAS = resultado.tabela.map(r => ({
-    n: r.n,
-    venc: fmtDate(r.dtVenc),
-    dtVenc: r.dtVenc,
-    // campos compatíveis com o modelo original do dashboard
-    juros: r.H,      // juros pré (cobrados pelo banco)
-    jurosIdx: r.G,   // indexador (CDI)
-    seguro: r.F,     // prestamista
-    // campos auxiliares
-    amort: r.I,
-    parcela: r.J,
-    saldoDev: r.K,
-    dias: r.D
-  }));
+  PARCELAS = mapearParcelas(resultado.tabela);
+  PARAMS_CALC = p;
+  CDI_CREDITO = p.txCdiA;
 
   VALOR_LIQUIDO = p.valorFin - p.iof;  // valor aplicado = financiado - IOF
   META = {
@@ -934,6 +951,7 @@ function calcular() {
     valorFinanciado: p.valorFin,
     cdiAplicPct: p.cdiAplicPctRaw,
     produto: 'RDC',
+    coefSeg: resultado.coefSeg,
     dtLib: p.dtLib,
     dtParc: p.dtParc
   };
@@ -957,6 +975,8 @@ function calcular() {
   document.getElementById('disc-amort').textContent = (p.amortizacao === 'price')
     ? 'PRICE (parcela fixa com juros decrescentes)'
     : 'SAC (parcelas decrescentes com amortização constante)';
+  document.getElementById('disc-base').textContent = fmt(Math.max(0, p.valorFin - p.iof));
+  document.getElementById('disc-coef').textContent = (resultado.coefSeg || 0).toLocaleString('pt-BR', { minimumFractionDigits: 6, maximumFractionDigits: 6 });
 
   // Info strip (topo do dashboard)
   const infoTxLabel = p.modalidade === 'pos' ? 'Spread + CDI' : 'Taxa Pré-fixada';
@@ -977,6 +997,7 @@ function calcular() {
   document.getElementById('hero-section').style.paddingBottom = '0';
   document.getElementById('dashboard').style.display = 'block';
   document.getElementById('dashboard').setAttribute('data-date', new Date().toLocaleDateString('pt-BR'));
+  document.getElementById('dashboard').setAttribute('data-amort', p.amortizacao === 'price' ? 'PRICE' : 'SAC');
 
   // Inicializa sliders (uma vez)
   if (!slidersInit) {
@@ -994,6 +1015,22 @@ function calcular() {
 function clampSlider(v, el) {
   const mn = +el.min, mx = +el.max;
   return Math.min(mx, Math.max(mn, v));
+}
+
+// Mapeia a tabela do motor de cálculo para o formato usado pelo dashboard
+function mapearParcelas(tabela) {
+  return tabela.map(r => ({
+    n: r.n,
+    venc: fmtDate(r.dtVenc),
+    dtVenc: r.dtVenc,
+    juros: r.H,      // taxa fixa (spread pós ou pré)
+    jurosIdx: r.G,   // indexador (CDI)
+    seguro: r.F,     // prestamista
+    amort: r.I,
+    parcela: r.J,
+    saldoDev: r.K,
+    dias: r.D
+  }));
 }
 
 /* ══════════════════════════════════════════════════════════════════
@@ -1029,9 +1066,11 @@ function buildSerie(txCDIpct, pctCDI, irAliq) {
   const txMensalApp = (pctCDI / 100) * txCdiMensal;
   const irFrac = irAliq / 100;
 
-  // Saldo da aplicação = VALOR FINANCIADO INTEIRO (igual P4 da planilha)
-  const valorAplicado = META.valorFinanciado || VALOR_LIQUIDO;
+  // Saldo da aplicação = valor LIBERADO (financiado - IOF). O IOF financiado
+  // não é capital investido do cliente; a planilha-mãe usava P4 = C5 (com IOF),
+  // o que superestimava o rendimento quando há IOF financiado.
   const iofMeta = META.iof || 0;
+  const valorAplicado = Math.max(0, (META.valorFinanciado || 0) - iofMeta);
   let saldo = valorAplicado;
   let pagosAcum = 0, recBrutoAcum = 0;
 
@@ -1078,6 +1117,17 @@ function render() {
   document.getElementById('lb-cdi').textContent = txCDI.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2}) + '%';
   document.getElementById('lb-pct').textContent = pctCDI + '%';
   document.getElementById('lb-ir').textContent  = irAliq + '%';
+
+  // Crédito pós-fixado é indexado ao CDI: mover o slider de CDI recalcula
+  // também o custo do crédito (antes só a aplicação era recalculada, o que
+  // distorcia os cenários a favor da aplicação)
+  if (PARAMS_CALC && PARAMS_CALC.modalidade === 'pos' && CDI_CREDITO !== null && Math.abs(txCDI/100 - CDI_CREDITO) > 1e-9) {
+    CDI_CREDITO = txCDI/100;
+    const res = calcularTabelaPlanilha(Object.assign({}, PARAMS_CALC, { txCdiA: CDI_CREDITO }));
+    PARCELAS = mapearParcelas(res.tabela);
+    const elCdi = document.getElementById('disc-tx-cdi');
+    if (elCdi) elCdi.textContent = txCDI.toLocaleString('pt-BR') + '%';
+  }
 
   const serie       = buildSerie(txCDI, pctCDI, irAliq);
   const cross       = findCross(serie);
@@ -1255,7 +1305,7 @@ document.querySelectorAll('.amort-tab').forEach(tab => {
 document.getElementById('btn-calcular').addEventListener('click', calcular);
 
 document.getElementById('btn-limpar').addEventListener('click', () => {
-  ['in-dt-lib','in-dt-parc','in-qt-parc','in-tx-pre','in-tx-cdi','in-tx-cdi-pre','in-tx-spread','in-vl-cred','in-vl-iof','in-vl-prest','in-cdi-aplic'].forEach(id => {
+  ['in-dt-lib','in-dt-parc','in-qt-parc','in-tx-pre','in-tx-cdi','in-tx-cdi-pre','in-tx-spread','in-vl-cred','in-vl-iof','in-vl-prest','in-vl-prest2','in-cdi-aplic'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
@@ -1273,6 +1323,7 @@ document.getElementById('btn-exemplo').addEventListener('click', () => {
   document.getElementById('in-vl-cred').value   = '7.000.000,00';
   document.getElementById('in-vl-iof').value    = '0,00';
   document.getElementById('in-vl-prest').value  = '0,00';
+  document.getElementById('in-vl-prest2').value = '0,00';
   document.getElementById('in-cdi-aplic').value = '105';
   escondeErro();
 });
@@ -1286,6 +1337,7 @@ document.getElementById('btn-novo').addEventListener('click', () => {
   if (chartDif)  { chartDif.destroy();  chartDif  = null; }
   if (chartSaldo){ chartSaldo.destroy();chartSaldo = null; }
   PARCELAS = []; VALOR_LIQUIDO = 0; META = {};
+  PARAMS_CALC = null; CDI_CREDITO = null;
   slidersInit = false;
   window.scrollTo({ top: 0, behavior: 'smooth' });
 });
@@ -1635,7 +1687,7 @@ async function gerarPDFDigital() {
     const discItems = [
       { t:'Simulação realizada em '+new Date().toLocaleDateString('pt-BR')+', 1ª parcela em '+META.primeiroVencimento+'.', green:false },
       { t:'Rentabilidade da aplicação (RDC): '+pctCDI+'% do CDI. CDI ao ano: '+txCDI.toLocaleString('pt-BR')+'%.', green:false },
-      { t:'Empréstimo SAC (amortização constante) — modalidade '+modaPdfLabel+'.', green:false },
+      { t:'Empréstimo '+(META.amortizacao === 'price' ? 'PRICE (parcela fixa)' : 'SAC (amortização constante)')+' — modalidade '+modaPdfLabel+'.', green:false },
       { t:'Simulação baseada em projeções de mercado. Fonte CDI futuro: www2.bmf.com.br', green:false },
       { t:'Simulação NÃO considera retorno de sobras sobre os juros pagos e recebidos.', green:true },
       { t:'Alterações no cenário econômico podem afetar a rentabilidade dos investimentos.', green:false }
