@@ -1,0 +1,153 @@
+<title>Carta da Consultoria Presencial</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Inter+Tight:wght@800;900&family=Instrument+Serif:ital@1&family=JetBrains+Mono:wght@500&family=Caveat:wght@600&display=swap">
+<style>
+/* Layout: carta em coluna única, mesma identidade da carta do Método WM (fundo noturno, título pesado + itálico amarelo, rótulos mono) */
+:root{
+  --bg:#060b16; --card:#0c1424; --line:#1d2840; --fg:#e8ecf3; --muted:#9aa4b8;
+  --gold:#f5c84c; --blue:#5aa9ff; --green:#25d366; --red:#ef5a5a;
+  --display:"Inter Tight",Inter,system-ui,sans-serif; --serif:"Instrument Serif",Georgia,serif;
+  --body:Inter,system-ui,sans-serif; --mono:"JetBrains Mono",ui-monospace,monospace; --script:Caveat,"Segoe Script",cursive;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:17px;line-height:1.65;margin:0}
+.wrap{max-width:640px;margin:0 auto;padding-block:28px 120px;padding-left:max(18px,env(safe-area-inset-left,0px));padding-right:max(18px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:56px}
+.head{display:flex;align-items:center;gap:14px}
+.av{width:52px;height:52px;border-radius:50%;border:2px solid var(--gold);display:grid;place-items:center;font-family:var(--display);font-weight:800;color:var(--gold);flex:none}
+.head b{display:block;font-size:16px}
+.mono{font-family:var(--mono);font-size:11.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+.eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);margin:0 0 6px}
+h1{font-family:var(--display);font-weight:900;font-size:clamp(34px,8vw,48px);line-height:1.02;letter-spacing:-.04em;margin:0;text-wrap:balance}
+h1 em{display:block;font-family:var(--serif);font-weight:400;font-size:1.08em;letter-spacing:-.01em;color:var(--gold);margin-top:8px}
+h2{font-family:var(--display);font-weight:800;font-size:clamp(24px,5.5vw,30px);line-height:1.1;letter-spacing:-.03em;margin:0;text-wrap:balance}
+.lead{border-left:3px solid var(--gold);padding-left:16px;margin-top:22px;font-size:15px;color:var(--muted);line-height:1.5}
+.lead strong{color:var(--fg)}
+.prose{display:flex;flex-direction:column;gap:18px}
+.prose p{margin:0}
+.prose strong{color:#fff}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}
+.cell{border:1px solid var(--line);border-radius:12px;padding:14px;min-width:0}
+.cell .mono{font-size:10.5px}
+.cell b{display:block;font-family:var(--display);font-weight:800;font-size:22px;letter-spacing:-.02em;margin-top:6px}
+.note{font-family:var(--mono);font-size:11.5px;color:var(--muted);margin-top:12px;line-height:1.5}
+.why{display:flex;flex-direction:column;gap:12px;margin-top:18px}
+.why .card{display:grid;grid-template-columns:34px 1fr;gap:6px 12px}
+.why .n{font-family:var(--serif);font-style:italic;font-size:40px;line-height:1;color:var(--gold);grid-row:span 2}
+.why h3{margin:0;font-size:17px;font-weight:700}
+.why p{margin:0;color:var(--muted);font-size:15.5px}
+ul.dots{list-style:none;padding:0;margin:18px 0;display:flex;flex-direction:column;gap:12px}
+ul.dots li{position:relative;padding-left:24px}
+ul.dots li::before{content:"";position:absolute;left:2px;top:.62em;width:9px;height:9px;border-radius:50%;background:var(--red);box-shadow:0 0 10px var(--red)}
+ul.dots strong{color:#fff}
+ol.steps{list-style:none;padding:0;margin:18px 0 0;display:flex;flex-direction:column;gap:14px;counter-reset:s}
+ol.steps li{display:grid;grid-template-columns:30px 1fr;gap:14px;counter-increment:s}
+ol.steps li::before{content:counter(s);width:30px;height:30px;border-radius:50%;background:var(--gold);color:var(--bg);font-weight:700;font-size:14px;display:grid;place-items:center;margin-top:2px}
+ol.steps strong{color:#fff}
+.cases{border:1px solid rgba(37,211,102,.35);background:linear-gradient(180deg,rgba(37,211,102,.06),transparent 40%);border-radius:20px;padding:22px}
+.cases p.sub{color:var(--muted);margin:6px 0 16px;font-size:15.5px}
+.case{display:flex;align-items:center;gap:12px;padding:14px 16px;border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--fg);text-decoration:none;font-weight:600;font-size:15.5px;line-height:1.3;margin-top:10px;transition:border-color .15s,transform .15s}
+.case:hover,.case:focus-visible{border-color:var(--green);transform:translateY(-1px);outline:none}
+.case .dot{width:20px;height:20px;border-radius:50%;background:var(--green);flex:none}
+.case span{flex:1;min-width:0}
+.case small{font-family:var(--mono);font-size:11px;color:var(--green);flex:none}
+.sig{font-family:var(--script);font-size:46px;color:var(--gold);line-height:1;margin:0}
+.foot{border-top:1px solid var(--line);padding-top:18px;font-size:12.5px;color:var(--muted);line-height:1.6}
+.foot a{color:var(--muted)}
+.cta{position:fixed;left:0;right:0;bottom:0;padding:12px max(16px,env(safe-area-inset-right,0px)) calc(12px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));background:linear-gradient(0deg,var(--bg) 60%,transparent);z-index:5}
+.cta a{display:flex;justify-content:center;align-items:center;gap:10px;max-width:604px;margin:0 auto;background:var(--green);color:#062312;font-weight:700;text-decoration:none;padding:15px;border-radius:14px;box-shadow:0 10px 30px rgba(37,211,102,.25)}
+.cta a:focus-visible{outline:3px solid #fff;outline-offset:2px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<main class="wrap">
+  <header class="head">
+    <div class="av" aria-hidden="true">MM</div>
+    <div><b>Maicon Melo</b><span class="mono">Consultoria presencial · Investimento no exterior</span></div>
+  </header>
+
+  <section>
+    <h1>O vídeo ensina a abrir a conta. O banco vende o câmbio.<em>Ninguém senta do seu lado.</em></h1>
+    <p class="lead"><strong>Esta carta é para quem quer investir no exterior com segurança</strong> e prefere fazer isso pessoalmente, com alguém de confiança do lado, do primeiro cadastro à primeira compra.</p>
+  </section>
+
+  <section class="prose">
+    <p>Faz 18 anos que eu acompanho de perto o patrimônio de famílias e empresários. E aprendi uma coisa nesse tempo: <strong>o maior erro de quem investe lá fora quase nunca está no ativo escolhido.</strong></p>
+    <p>Está no câmbio pago caro sem perceber. No ETF americano que retém 30% dos dividendos na fonte quando havia alternativa melhor. Na conta aberta no lugar errado. E na declaração do Imposto de Renda feita no improviso.</p>
+    <p>O tutorial ensina um pedaço, o banco vende outro, o contador só vê no fim do ano. <strong>Só que um mexe no outro</strong>, e ninguém faz o caminho inteiro junto com você.</p>
+  </section>
+
+  <section class="card" aria-label="O que você leva da consultoria">
+    <p class="eyebrow">O que você leva da consultoria</p>
+    <div class="mono" style="letter-spacing:.04em;text-transform:none">Um encontro presencial · do zero à carteira montada</div>
+    <div class="grid">
+      <div class="cell"><span class="mono">Conta no exterior</span><b style="color:var(--gold)">Aberta</b></div>
+      <div class="cell"><span class="mono">Primeira remessa</span><b style="color:var(--blue)">Enviada</b></div>
+      <div class="cell"><span class="mono">Primeiros ativos</span><b style="color:var(--green)">Comprados</b></div>
+      <div class="cell"><span class="mono">Imposto de Renda</span><b style="color:var(--gold)">Planejado</b></div>
+    </div>
+    <p class="note">Você faz cada etapa no seu próprio celular ou computador, comigo do lado.</p>
+  </section>
+
+  <section>
+    <p class="eyebrow">Por que eu, por que assim, por que funciona</p>
+    <h2>A consultoria em três respostas</h2>
+    <div class="why">
+      <div class="card"><span class="n">1</span><h3>Por que eu</h3><p>18 anos de mercado, acompanhando patrimônio de perto e vendo na prática o que funciona e o que é propaganda.</p></div>
+      <div class="card"><span class="n">2</span><h3>Por que presencial</h3><p>Cada clique explicado na hora. Você pergunta, eu mostro, e você aprende a fazer sozinho daqui para frente.</p></div>
+      <div class="card"><span class="n">3</span><h3>Por que funciona</h3><p>Você sai do encontro com a conta aberta, a remessa feita e os primeiros ativos comprados. Sem produto para empurrar.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <p class="eyebrow">O momento</p>
+    <h2>Por que agora e não daqui a dois anos</h2>
+    <ul class="dots">
+      <li><strong>Desde 2026, dividendo acima de R$ 50 mil por mês</strong> tem 10% de imposto retido na fonte no Brasil.</li>
+      <li><strong>O investimento no exterior tem regra clara</strong>: desde 2024, 15% sobre os rendimentos, apurado na declaração anual (Lei 14.754/2023).</li>
+      <li><strong>Todo o seu patrimônio está numa moeda só.</strong> Quando o real perde valor, ele perde junto.</li>
+    </ul>
+    <p style="margin:0;color:var(--muted)">Quem diversifica antes escolhe o momento do câmbio. Quem deixa para depois paga o câmbio que sobrou.</p>
+  </section>
+
+  <section>
+    <p class="eyebrow">Como funciona</p>
+    <h2>Do primeiro contato à carteira montada</h2>
+    <ol class="steps">
+      <li><div><strong>Você me chama no WhatsApp</strong> e me conta o seu objetivo.</div></li>
+      <li><div><strong>Uma conversa rápida</strong> para entender o seu caso e ver se a consultoria faz sentido para você.</div></li>
+      <li><div><strong>O encontro presencial</strong>: abertura da conta, envio dos recursos e compra dos primeiros ativos, tudo juntos.</div></li>
+      <li><div><strong>Acompanhamento contínuo</strong> depois, até você se sentir seguro para seguir sozinho.</div></li>
+    </ol>
+  </section>
+
+  <section class="cases" id="casos">
+    <h2>Qual destes é o seu caso?</h2>
+    <p class="sub">Toca no que mais parece com você. O botão abre o meu WhatsApp com a mensagem pronta.</p>
+    <a class="case" data-msg="nunca investi fora e quero começar do zero"><i class="dot"></i><span>Você nunca investiu fora e quer começar do zero</span><small>WhatsApp</small></a>
+    <a class="case" data-msg="comecei a abrir uma conta no exterior e travei no meio"><i class="dot"></i><span>Você começou a abrir a conta e travou no meio</span><small>WhatsApp</small></a>
+    <a class="case" data-msg="já tenho conta no exterior, mas não sei o que comprar"><i class="dot"></i><span>Você já tem conta lá fora, mas não sabe o que comprar</span><small>WhatsApp</small></a>
+    <a class="case" data-msg="quero entender câmbio, IOF e custos antes de enviar dinheiro"><i class="dot"></i><span>Você quer entender câmbio, IOF e custos antes de enviar</span><small>WhatsApp</small></a>
+    <a class="case" data-msg="quero proteger parte do meu patrimônio em dólar"><i class="dot"></i><span>Você quer proteger parte do patrimônio em dólar</span><small>WhatsApp</small></a>
+    <a class="case" data-msg="tenho dúvida de como declarar investimentos no exterior no Imposto de Renda"><i class="dot"></i><span>Você tem dúvida de como declarar no Imposto de Renda</span><small>WhatsApp</small></a>
+  </section>
+
+  <section>
+    <p class="sig">Maicon Melo</p>
+    <p class="mono" style="margin-top:8px;text-transform:none;letter-spacing:.02em">Wealth Planning e Investimentos · @maiconademelo</p>
+  </section>
+
+  <footer class="foot">Conteúdo educativo. A consultoria é educação financeira e não constitui recomendação individual de investimento. Investimentos no exterior envolvem riscos, inclusive o cambial, e rentabilidade passada não garante rentabilidade futura. <a href="https://wealthplanning.app/privacidade">Privacidade</a> · <a href="https://wealthplanning.app/metodo-wm">Conheça o Método WM</a></footer>
+</main>
+
+<div class="cta"><a id="cta-main" data-msg="quero agendar a consultoria presencial de investimento no exterior">Falar com o Maicon no WhatsApp</a></div>
+
+<script>
+const WA="https://wa.me/5547992615146?text=";
+const base="Oi, Maicon! Li a sua carta da Consultoria Presencial e ";
+document.querySelectorAll("[data-msg]").forEach(a=>{
+  a.href=WA+encodeURIComponent(base+a.dataset.msg+".");
+  a.target="_blank";a.rel="noopener";
+});
+</script>
